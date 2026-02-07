@@ -3,13 +3,14 @@
 Usage: iptv [OPTIONS] --user <USER> --passwd <PASSWD> --mac <MAC>
 
 Options:
-  -u, --user <USER>                      Login username
-  -p, --passwd <PASSWD>                  Login password
-  -m, --mac <MAC>                        MAC address
-  -i, --imei <IMEI>                      IMEI [default: ]
-  -b, --bind <BIND>                      Bind address:port [default: 127.0.0.1:7878]
-  -a, --address <ADDRESS>                IP address/interface name [default: ]
-  -I, --interface <INTERFACE>            Interface to request
+  -u, --user <USER>                      Login username (or config [app].user)
+  -p, --passwd <PASSWD>                  Login password (or config [app].passwd)
+  -m, --mac <MAC>                        MAC address (or config [app].mac)
+  -i, --imei <IMEI>                      IMEI (or config [app].imei) [default: ]
+  -b, --bind <BIND>                      Bind address:port (or config [app].bind) [default: 0.0.0.0:7878]
+  -a, --address <ADDRESS>                IP address/interface name (or config [app].address) [default: ]
+  -I, --interface <INTERFACE>            Interface to request (or config [app].interface)
+  -c, --config <CONFIG>                  Config file path (TOML)
       --extra-playlist <EXTRA_PLAYLIST>  Url to extra m3u
       --extra-xmltv <EXTRA_XMLTV>        Url to extra xmltv
       --udp-proxy                        Use UDP proxy
@@ -17,10 +18,35 @@ Options:
   -h, --help                             Print help
 ```
 
+### Config file (TOML)
+You can put most settings into a config file and pass it via `-c/--config`.
+
+Key features in config:
+- Channel alias rules (`[alias]` + `[[alias.rules]]`), supports map and regex rules, with `first_match` or `chain` mode.
+- Playlist rendering templates (`[template]`), customize `#EXTINF` and URL lines.
+- Token-based protection (`[auth]`) for endpoints.
+- Management endpoints switch (`[manage]`).
+- XMLTV alias naming (`[xmltv]`).
+
+Example: `config/iptv.toml` (see full file in repo).
+
 ### Endpoints
 
-- `/playlist`: m3u8 list
-- `/xmltv`: EGP
+- `/playlist`: m3u8 list (with alias/group/sort/template)
+- `/xmltv`: EPG
+- `/status`: system/status page (uptime, counts, config info)
+- `/manage`: management dashboard
+- `/manage/config`: view current config (token redacted)
+- `/manage/reload`: reload config and templates
+- `/manage/test?name=...`: test alias/group/resolution
+- `/manage/channels`: channels JSON
+- `/manage/channels/html`: channels UI
+
+### Token protection
+If `auth.token` is set and the endpoint is in `auth.protect`, provide token by:
+- Header: `Authorization: Bearer <TOKEN>`
+- Header: `X-Api-Token: <TOKEN>`
+- Query: `?token=<TOKEN>`
 
 ### Example init.d
 
@@ -37,7 +63,7 @@ INTERFACE=pppoe-iptv
 BIND=0.0.0.0:7878
 
 start() {
-        ( RUST_LOG=info /usr/bin/iptv -u $USER -p $PASSWD -m $MAC -b $BIND -I $INTERFACE --udp-proxy --rtsp-proxy 2>&1 & echo $! >&3 ) 3>/var/run/iptv.pid | logger -t "iptv-proxy" &
+        ( RUST_LOG=info /usr/bin/iptv -c /etc/iptv/iptv.toml -b $BIND -I $INTERFACE --udp-proxy --rtsp-proxy 2>&1 & echo $! >&3 ) 3>/var/run/iptv.pid | logger -t "iptv-proxy" &
 }
 
 stop() {
