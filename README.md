@@ -74,40 +74,37 @@ stop() {
 }
 ```
 
-### Build for openwrt
-You don't need to install openwrt sdk for this.
+### Build
+Native build:
 ```bash
-rustup target add x86_64-unknown-linux-musl
-cargo build -r --target x86_64-unknown-linux-musl
-```
-Append `--features rustls-tls` if need tls support.
-
-To reduce binary size, you need to install openwrt sdk to ${openwrt}, and then build with
-```bash
-rustup +nightly target add x86_64-unknown-linux-musl
-rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
-toolchain="$(ls -d ${openwrt}/staging_dir/toolchain-*)"
-export RUSTFLAGS="-Ctarget-feature=-crt-static -Zlocation-detail=none -Zunstable-options -Cpanic=immediate-abort -Clinker=$(ls ${toolchain}/bin/*-openwrt-linux-gcc)"
-cargo +nightly build -Zbuild-std=std,panic_abort -r --target x86_64-unknown-linux-musl
+cargo build -r
 ```
 
-#### Build with openssl for openwrt
-You need to install openwrt sdk to ${openwrt}, and then prepare:
+Cross build (same toolchain as CI, no OpenWrt SDK required):
+```bash
+cargo install cargo-cross
+cargo cross build -r --target x86_64-unknown-linux-musl
+```
+
+TLS features:
+- `--features rustls` for Rustls (no system OpenSSL).
+- `--features tls` for OpenSSL (requires OpenWrt SDK toolchain and libs).
+
+#### OpenWrt + OpenSSL (optional)
+If you need OpenSSL on OpenWrt, install the SDK to `${openwrt}` and build with:
 ```bash
 cd ${openwrt}
 ./scripts/feeds update
 ./scripts/feeds install openssl
 make V=s -j$(nproc)
-```
-Then build with
-```bash
+
 rustup target add x86_64-unknown-linux-musl
 export PKG_CONFIG_SYSROOT_DIR=$(ls -d ${openwrt}/staging_dir/target-*)
 export PKG_CONFIG_PATH=$PKG_CONFIG_SYSROOT_DIR/usr/lib/pkgconfig
 toolchain="$(ls -d ${openwrt}/staging_dir/toolchain-*)"
 export TARGET_CC=$(ls ${toolchain}/bin/*-openwrt-linux-gcc)
 export STAGING_DIR=$PKG_CONFIG_SYSROOT_DIR
-export RUSTFLAGS="-C target-feature=-crt-static -Zlocation-detail=none -C linker=$(ls ${toolchain}/bin/*-openwrt-linux-gcc)"
+export RUSTFLAGS="-C target-feature=-crt-static -C linker=$(ls ${toolchain}/bin/*-openwrt-linux-gcc)"
 cargo build -r --target x86_64-unknown-linux-musl --features tls
 ```
 
